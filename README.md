@@ -1,6 +1,6 @@
-# AI_Omics_Internship_2025
+# AI\_Omics\_Internship\_2025
 
-This project contains the code and data for different **Modules** of the AI & Omics Research Internship (2025), where we load, clean, and preprocess a clinical dataset in R.
+This project contains the code and data for different **Modules** of the AI & Omics Research Internship (2025), where we load, clean, preprocess, and analyze biological datasets in R.
 
 ---
 
@@ -15,55 +15,87 @@ Module_I/
 ├── plots/                 # Figures generated
 ├── results/               # Analysis outputs, tables, etc.
 └── README.md              # This file
+
+Module_II/
+├── raw_data/              # DEGs data (downloaded automatically)
+├── results/               # Processed DEGs tables
+├── scripts/               # R scripts
+│   └── classify_DEGs.R    # DEG classification + summary
+└── README.md              # This file
 ```
 
 ---
 
 ## 🚀 Getting Started
 
+### Module I: Clinical Data Cleaning
+
 1. **Clone your repo** (or download this folder) into your `AI_Omics_Internship_2025/Module_I` directory.
 
 2. **Open in RStudio**
-   - Double-click the `Module_I.Rproj` file to launch your RStudio project.
-   - This ensures all file-paths are relative to the project root.
+
+   * Double-click the `Module_I.Rproj` file to launch your RStudio project.
+   * This ensures all file-paths are relative to the project root.
 
 3. **Install prerequisites**
-   
-   In the R console, run:
+
    ```r
    install.packages(c("tidyverse"))
    ```
 
 4. **Run the data-cleaning script**
-   
-   In RStudio, open **scripts/class_Ib.R** and click **Source**.
-   - It will create the `raw_data/`, `clean_data/`, `scripts/`, etc. folders (if they don't exist).
-   - It will download `patient_info.csv`, inspect and clean it, then write out `clean_data/patient_info_clean.csv`.
+
+   * Open **scripts/class\_Ib.R** in RStudio and click **Source**.
+   * It will download `patient_info.csv`, inspect and clean it, then write out `clean_data/patient_info_clean.csv`.
+
+---
+
+### Module II: DEG Classification
+
+1. **Open in RStudio**
+
+   * Navigate to the `Module_II` directory and open your project.
+
+2. **Run the DEG classification script**
+
+   * Open **scripts/classify\_DEGs.R** and click **Source**.
+   * The script will:
+
+     * Download `DEGs_Data_1.csv` and `DEGs_Data_2.csv` from GitHub.
+     * Replace missing `padj` values with 1.
+     * Classify each gene as **Upregulated**, **Downregulated**, or **Not\_Significant**.
+     * Save processed results in the `results/` folder.
+     * Print summary counts using `table()` for each dataset and combined results.
 
 ---
 
 ## 📝 Script Overview
 
-- **Directory setup**: Creates and sets your working directories.
-- **Download & load**: Grabs the CSV from GitHub into `raw_data/`.
-- **Inspect**: Uses `str()`, `summary()`, `head()/tail()`, and `colSums(is.na())`.
-- **Type conversions**: Factors for categorical vars, numerics for continuous.
-- **Binary smoker flag**: New factor `smoking_binary` (0 = No, 1 = Yes).
-- **Save cleaned data**: Outputs `patient_info_clean.csv` in `clean_data/`.
+* **Module I (class\_Ib.R)**
+
+  * Directory setup & data download
+  * Inspect structure, types, missingness
+  * Convert variables to correct formats
+  * Add binary `smoking_binary` flag
+  * Save `patient_info_clean.csv`
+
+* **Module II (classify\_DEGs.R)**
+
+  * Define `classify_gene()` function
+  * Handle missing values (`padj → 1`)
+  * Apply classification with a for-loop
+  * Add `status` column to each dataset
+  * Save processed DEG tables + combined results
+  * Print summaries with `table()`
 
 ---
 
 ## 📋 Prerequisites
 
-- **R** ≥ 4.0
-- **RStudio** (to manage the project file)
-- **Internet connection** (to download the CSV)
-- R packages:
-  - `tidyverse` (for data manipulation; you can replace base code if preferred)
+* **R** ≥ 4.0
+* **RStudio** (to manage the project files)
+* **Internet connection** (to download CSVs)
+* R packages:
 
----
-
-## 👩‍💻 Next Steps
-
-- If you build additional modules, consider refactoring reusable functions into a utility script (e.g. `scripts/utils.R`).
-- Add your own analysis or visualization scripts in the `scripts/` folder and save outputs under `plots/` or `results/`.
+  * `tidyverse` (for data manipulation; Module I)
+  * `utils` (base R, for CSV download; Module II)

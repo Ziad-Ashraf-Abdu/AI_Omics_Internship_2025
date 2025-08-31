@@ -137,7 +137,7 @@ for (col in names(data_types)) {
 
 # Check unique values in categorical columns
 cat("\nAnalyzing categorical columns:\n")
-categorical_cols <- sapply(patient_data, function(x) is.character(x) || is.factor(x))
+categorical_cols <- sapply(patient_data, function(x) is.character(x) || is.factor(x) || is.integer(x) || is.numeric(x))
 for (col in names(patient_data)[categorical_cols]) {
   unique_vals <- unique(patient_data[[col]])
   cat("  •", col, ":", length(unique_vals), "unique values -", paste(unique_vals, collapse = ", "), "\n")
