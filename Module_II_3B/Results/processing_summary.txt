@@ -1,0 +1,7 @@
+GEO accession: GSE79973 
+Series-matrix probes × samples: 54675 × 20 
+Normalized probes × samples: 54675 × 20 
+After intensity filtering: 50441 probes
+After variance filtering: 25220 probes
+Missing phenotype source_name_ch1 values: 0 
+Potential outlier samples (distance rule): GSM2109532 
