@@ -7,7 +7,7 @@
 # --------------------------
 if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 
-# Bioconductor packages requested in the assignment
+# Bioconductor packages
 bioc_pkgs <- c("GEOquery", "affy", "arrayQualityMetrics", "genefilter", "AnnotationDbi")
 for (p in bioc_pkgs) {
   if (!suppressWarnings(requireNamespace(p, quietly = TRUE))) {
@@ -16,7 +16,7 @@ for (p in bioc_pkgs) {
   }
 }
 
-# CRAN packages requested
+# CRAN packages
 cran_pkgs <- c("dplyr", "matrixStats")
 for (p in cran_pkgs) {
   if (!suppressWarnings(requireNamespace(p, quietly = TRUE))) {
@@ -25,11 +25,11 @@ for (p in cran_pkgs) {
   }
 }
 
-# Load libraries (explicit as per assignment)
+# Load libraries 
 library(GEOquery)
 library(affy)
 library(arrayQualityMetrics)
-library(dplyr)         # requested in assignment
+library(dplyr)         #   in assignment
 library(matrixStats)   # for rowMedians
 # genefilter might be optional on some systems; load if available
 if (suppressWarnings(requireNamespace("genefilter", quietly = TRUE))) library(genefilter)
@@ -59,12 +59,12 @@ if (length(gse_list) == 0) stop("No GSE matrix found for ", gse_acc)
 if (length(gse_list) > 1) message("Multiple ExpressionSets found; using the first one returned by getGEO()")
 eset <- gse_list[[1]]
 
-# variables named as in the assignment
+# variables 
 expression_data <- exprs(eset)
 feature_data    <- fData(eset)
 phenotype_data  <- pData(eset)
 
-# check missing values in sample annotation (assignment asked for this)
+# check missing values in sample annotation 
 na_count_source <- sum(is.na(phenotype_data$source_name_ch1))
 message("Missing values in phenotype_data$source_name_ch1: ", na_count_source)
 message(sprintf("Series-matrix loaded: %d probes × %d samples", nrow(expression_data), ncol(expression_data)))
@@ -72,12 +72,6 @@ message(sprintf("Series-matrix loaded: %d probes × %d samples", nrow(expression
 # --------------------------
 # 2) Attempt to retrieve raw CEL files
 # --------------------------
-# The assignment mentions getGEOSuppFiles / untar / unzip — examples are left commented
-# Uncomment the following to attempt downloading huge supplementary files (grading machines beware):
-# getGEOSuppFiles(gse_acc, baseDir = raw_dir, makeDirectory = TRUE)
-# untar(file.path(raw_dir, "GSE79973_RAW.tar"), exdir = file.path(raw_dir, "CEL_Files"))
-# unzip(file.path(raw_dir, "E-GEOD-79973.zip"), exdir = file.path(raw_dir, "E_GEOD79973"))
-
 # Find any CEL files under Raw_Data (supports .CEL and .CEL.gz).
 # IMPORTANT: correct escaping for R string below (two backslashes)
 cel_candidates <- list.files(
@@ -126,11 +120,11 @@ if (exists("raw_data") && inherits(raw_data, "AffyBatch")) {
   normalized_eset <- eset
 }
 
-normalized_data <- exprs(normalized_eset)   # variable name used in the assignment
+normalized_data <- exprs(normalized_eset)    
 write.csv(normalized_data, file = file.path(results_dir, "normalized_expression_matrix.csv"))
 message("Normalized expression matrix saved to Results/normalized_expression_matrix.csv")
 
-# QC after normalization (assignment requirement)
+# QC after normalization
 qc_norm_dir <- file.path(results_dir, "QC_Normalized_Data")
 if (!dir.exists(qc_norm_dir)) dir.create(qc_norm_dir, recursive = TRUE)
 arrayQualityMetrics(expressionset = normalized_eset, outdir = qc_norm_dir, force = TRUE)
@@ -147,13 +141,13 @@ abline(v = default_threshold, col = "black", lwd = 2)
 dev.off()
 message("Saved probe median histogram to Results/probe_median_hist.png (vertical line at threshold: ", default_threshold, ")")
 
-# Apply intensity threshold (assignment uses 3.5)
+# Apply intensity threshold
 threshold <- default_threshold
 keep_idx <- probe_median > threshold
 filtered_data <- normalized_data[keep_idx, , drop = FALSE]
 message(sprintf("Filtered by intensity: before = %d probes, after = %d probes", nrow(normalized_data), nrow(filtered_data)))
 
-# Rename filtered expression data with sample metadata as requested
+# Rename filtered expression data with sample metadata as  
 if (!is.null(rownames(phenotype_data))) colnames(filtered_data) <- rownames(phenotype_data)
 
 # --------------------------
@@ -183,7 +177,7 @@ if (!is.null(phenotype_data$source_name_ch1)) {
                    labels = c("normal", "cancer"))
   message("Groups factor created. Levels: ", paste(levels(groups), collapse = ", "))
 } else {
-  message("phenotype_data$source_name_ch1 is not available — cannot create groups as requested")
+  message("phenotype_data$source_name_ch1 is not available — cannot create groups as  ")
   groups <- NULL
 }
 
