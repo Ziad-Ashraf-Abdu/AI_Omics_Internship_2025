@@ -1,101 +1,75 @@
-# AI\_Omics\_Internship\_2025
+# AI_Omics_Internship_2025
 
-This project contains the code and data for different **Modules** of the AI & Omics Research Internship (2025), where we load, clean, preprocess, and analyze biological datasets in R.
+This repository contains code and data for different **Modules** of the AI & Omics Research Internship (2025). Each module implements a small reproducible workflow in R: downloading data, cleaning / preprocessing, quality control and producing results for reporting.
 
 ---
 
-## 📂 Folder Structure
+## 📂 Top-level Folder Structure (updated)
 
 ```
 Module_I/
-├── raw_data/              # Unmodified source data (patient_info.csv)
-├── clean_data/            # Cleaned datasets
-├── scripts/               # R scripts
-│   └── class_Ib.R         # Main data-cleaning script
-├── plots/                 # Figures generated
-├── results/               # Analysis outputs, tables, etc.
-└── README.md              # This file
-
 Module_II/
-├── raw_data/              # DEGs data (downloaded automatically)
-├── results/               # Processed DEGs tables
-├── scripts/               # R scripts
-│   └── classify_DEGs.R    # DEG classification + summary
-└── README.md              # This file
+Module_II_EB/
+README.md                          # this file (updated)
 ```
 
 ---
 
-## 🚀 Getting Started
+## 📁 Module_I — Clinical Data Cleaning 
 
-### Module I: Clinical Data Cleaning
+Detailed structure: see `Module_I/README.md`.
 
-1. **Clone your repo** (or download this folder) into your `AI_Omics_Internship_2025/Module_I` directory.
+Quick start:
 
-2. **Open in RStudio**
+* Open `Module_I/Module_I.Rproj` in RStudio
+* Install prerequisites: `install.packages(c("tidyverse"))`
+* Source `Module_I/scripts/class_Ib.R`
 
-   * Double-click the `Module_I.Rproj` file to launch your RStudio project.
-   * This ensures all file-paths are relative to the project root.
-
-3. **Install prerequisites**
-
-   ```r
-   install.packages(c("tidyverse"))
-   ```
-
-4. **Run the data-cleaning script**
-
-   * Open **scripts/class\_Ib.R** in RStudio and click **Source**.
-   * It will download `patient_info.csv`, inspect and clean it, then write out `clean_data/patient_info_clean.csv`.
+Outputs: cleaned CSV in `Module_I/clean_data/` and plots in `Module_I/plots/`.
 
 ---
 
-### Module II: DEG Classification
+## 📁 Module_II — DEG Classification
 
-1. **Open in RStudio**
+Detailed structure: see `Module_II/README.md`.
 
-   * Navigate to the `Module_II` directory and open your project.
+Quick start:
 
-2. **Run the DEG classification script**
-
-   * Open **scripts/classify\_DEGs.R** and click **Source**.
-   * The script will:
-
-     * Download `DEGs_Data_1.csv` and `DEGs_Data_2.csv` from GitHub.
-     * Replace missing `padj` values with 1.
-     * Classify each gene as **Upregulated**, **Downregulated**, or **Not\_Significant**.
-     * Save processed results in the `results/` folder.
-     * Print summary counts using `table()` for each dataset and combined results.
+* Open `Module_II` project in RStudio
+* Source `Module_II/scripts/classify_DEGs.R`
+* Outputs written to `Module_II/results/`.
 
 ---
 
-## 📝 Script Overview
+## 📁 Module_II_3B
 
-* **Module I (class\_Ib.R)**
+This module implements the full preprocessing workflow for GEO series **GSE79973** (Affymetrix GPL570) as required by the AI & Omics Internship — Module II / Assignment #4.
 
-  * Directory setup & data download
-  * Inspect structure, types, missingness
-  * Convert variables to correct formats
-  * Add binary `smoking_binary` flag
-  * Save `patient_info_clean.csv`
+### Folder layout
 
-* **Module II (classify\_DEGs.R)**
+```
+Module_II_3B/
+├── raw_data/                   # optional: place downloaded CELs here (not required)
+├── scripts/
+│   └── Class_3B.R   # main R script (runs end-to-end)
+├── Results/                    # output folder created by the script
+│   ├── normalized_expression_matrix.csv
+│   ├── filtered_expression_matrix.csv
+│   ├── probe_median_hist.png
+│   ├── boxplot_normalized.png
+│   ├── PCA_normalized.png
+│   ├── QC_Normalized_Data/     # arrayQualityMetrics HTML report
+│   └── processing_summary.txt
+└── README.md
+```
 
-  * Define `classify_gene()` function
-  * Handle missing values (`padj → 1`)
-  * Apply classification with a for-loop
-  * Add `status` column to each dataset
-  * Save processed DEG tables + combined results
-  * Print summaries with `table()`
+### Required R packages
 
----
+The script will attempt to install missing packages. It assumes R ≥ 4.0. Main packages used:
+* tidyverse (for data manipulation; Module I)
+* utils (base R, for CSV download; Module II)
+* Bioconductor: `GEOquery`, `affy`, `arrayQualityMetrics`, `genefilter`, `AnnotationDbi`, `hgu133plus2.db` (annotation)
+* CRAN: `dplyr`, `matrixStats`
+**Fix annotation mapping** (important): the platform returned by GEO is `GPL570`; the correct Bioconductor annotation package is `hgu133plus2.db`. The script includes an automatic mapping lookup and will install/load `hgu133plus2.db` if needed.
 
-## 📋 Prerequisites
 
-* **R** ≥ 4.0
-* **RStudio** (to manage the project files)
-* **Internet connection** (to download CSVs)
-* R packages:
-
-  * `tidyverse` (for data manipulation; Module I)
-  * `utils` (base R, for CSV download; Module II)
