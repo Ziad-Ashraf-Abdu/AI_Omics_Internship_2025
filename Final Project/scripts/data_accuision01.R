@@ -1,66 +1,85 @@
-# -----------------------------------------------------------------------------
-# Script: 01_data_retrieval.R (FIXED)
-# Purpose: Download raw/processed data for GSE64810 (RNA-seq) and GSE9660 (Microarray).
-#          GSE9660 replaces GSE33000 for a stable, balanced dataset.
-# -----------------------------------------------------------------------------
-
-dir.create("data/raw", recursive = TRUE, showWarnings = FALSE)
-dir.create("data/processed", recursive = TRUE, showWarnings = FALSE)
-dir.create("results", recursive = TRUE, showWarnings = FALSE)
-
-if (!require("BiocManager", quietly = TRUE)) install.packages("BiocManager")
-if (!require("GEOquery")) BiocManager::install("GEOquery")
-if (!require("tidyverse")) install.packages("tidyverse")
+# ==============================================================================
+# SCRIPT 1: DATA RETRIEVAL (FIXED FOR GSE129473)
+# DATASET: GSE129473 (Human Caudate Nucleus, Normalized Counts)
+# OUTPUTS: data/raw_counts.csv, data/metadata_clean.csv
+# ==============================================================================
 
 library(GEOquery)
-library(tidyverse)
+library(dplyr)
+library(readr)
 
-message("[A] Starting Data Retrieval...")
+# Create a data directory
+if(!dir.exists("data")) dir.create("data")
 
-# --- 1. GSE64810 (RNA-seq) ---
-message("Downloading GSE64810 (Metadata)...")
-# We still use this to get the metadata (pData)
-gse64810_list <- getGEO("GSE64810", GSEMatrix = TRUE, destdir = "data/raw")
-gse64810_metadata_obj <- gse64810_list[[1]]
+message(">>> [1/3] Fetching Clinical Metadata from GEO...")
 
-message("Downloading GSE64810 (Supplementary Count Matrix)...")
-# The actual count data is in a supplementary file
-supp_files_path <- getGEOSuppFiles("GSE64810", baseDir = "data/raw")
+# Fetch the Series Matrix
+gse <- getGEO("GSE129473", GSEMatrix = TRUE)
+if (length(gse) > 1) idx <- grep("GPL", attr(gse, "names")) else idx <- 1
+gse_data <- gse[[idx]]
 
-# *** FIX: Point to the *correct* file provided by the authors ***
-# This is the DESeq2 normalized data, which is what we want.
-count_file_path <- file.path("data/raw", "GSE64810", "GSE64810_mlhd_DESeq2_norm_counts_adjust.txt.gz")
+# Extract Metadata
+metadata <- pData(gse_data)
 
-if (!file.exists(count_file_path)) {
-  # Fallback in case directory structure is different
-  message("File not found at expected path. Searching alternate path...")
-  alt_path <- list.files("data/raw", pattern = "DESeq2_norm_counts_adjust.txt.gz", 
-                         recursive = TRUE, full.names = TRUE)
-  if(length(alt_path) > 0) {
-    count_file_path <- alt_path[1]
-  } else {
-    stop("Could not find 'GSE64810_mlhd_DESeq2_norm_counts_adjust.txt.gz'. Download manually to 'data/raw/GSE64810/'")
-  }
+# ------------------------------------------------------------------------------
+# ROBUST CONDITION DETECTION
+# ------------------------------------------------------------------------------
+# Find the column describing the disease state
+target_col_idx <- which(apply(metadata, 2, function(x) any(grepl("Huntington", x, ignore.case = TRUE))))
+
+if(length(target_col_idx) == 0) {
+  print(colnames(metadata))
+  stop("CRITICAL ERROR: Could not find any column containing 'Huntington' in the metadata.")
 }
 
-# Read the gzipped count file
-message(paste("Reading count matrix from:", count_file_path))
-# The first column is GeneID, which read_tsv correctly parses.
-gse64810_counts <- read_tsv(count_file_path, comment = "#")
+target_col <- names(target_col_idx)[1]
+message(paste(">>> Found disease status info in column:", target_col))
 
-# The file has GeneID as col 1, and samples as others.
-# Convert to a matrix with GeneIDs as rownames
-gse64810_counts_matrix <- gse64810_counts %>% 
-  column_to_rownames(var = "...1") %>% # *** FIX: Use the "...1" column name from the console output ***
-  as.matrix()
+# ------------------------------------------------------------------------------
+# CLEANING & SAVING
+# ------------------------------------------------------------------------------
+clean_metadata <- metadata %>%
+  dplyr::mutate(condition = as.factor(ifelse(grepl("Huntington", .[[target_col]], ignore.case = TRUE), "HD", "Control")))
 
-# --- 2. GSE9660 (Microarray) ---
-# *** UPDATED: Using GSE9660. It is balanced and uses the simple hgu133a chip. ***
-message("Downloading GSE9660 (Microarray)...")
-gse9660_list <- getGEO("GSE9660", GSEMatrix = TRUE, destdir = "data/raw")
-gse9660 <- gse9660_list[[1]]
+write_csv(clean_metadata, "data/metadata_clean.csv")
+message(">>> Metadata saved to 'data/metadata_clean.csv'")
 
-save(gse64810_counts_matrix, gse64810_metadata_obj, gse9660, 
-     file = "data/raw/raw_gse_objects.RData")
+message(">>> [2/3] Fetching Count Matrix...")
 
-message("[A] Data Retrieval Complete. Saved to data/raw/raw_gse_objects.RData")
+# Download supplementary files if not already present
+# (The code checks if the file exists locally first to avoid re-downloading)
+files_in_dir <- list.files("GSE129473", full.names = TRUE)
+if(length(files_in_dir) == 0) {
+  getGEOSuppFiles("GSE129473")
+}
+
+# ------------------------------------------------------------------------------
+# FIXED FILE DETECTION LOGIC
+# ------------------------------------------------------------------------------
+# Look for "norm" or "csv" instead of just "counts"
+count_file_path <- list.files("GSE129473", pattern = "norm", full.names = TRUE)
+
+# Fallback: look for any csv.gz if "norm" isn't found
+if(length(count_file_path) == 0) {
+  count_file_path <- list.files("GSE129473", pattern = "csv.gz", full.names = TRUE)
+}
+
+if(length(count_file_path) == 0) stop("Error: No count file found in GSE129473 folder.")
+
+count_file <- count_file_path[1]
+message(paste(">>> Reading count file:", count_file))
+
+# ------------------------------------------------------------------------------
+# READING THE DATA (Using read.csv for CSV format)
+# ------------------------------------------------------------------------------
+# The file is comma-separated, so we use read.csv
+raw_counts <- read.csv(gzfile(count_file), row.names = 1)
+
+message(paste(">>> Data loaded. Dimensions:", nrow(raw_counts), "genes x", ncol(raw_counts), "samples"))
+
+# Note: These are likely ALREADY normalized.
+# We save them to data/raw_counts.csv to maintain pipeline consistency,
+# but treat them as your input expression matrix.
+write.csv(raw_counts, "data/raw_counts.csv", row.names = TRUE)
+
+message(">>> [3/3] Data Retrieval Complete. Files saved in 'data/' folder.")

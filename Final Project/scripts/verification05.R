@@ -1,121 +1,111 @@
-# -----------------------------------------------------------------------------
-# Script: 05_verification.R
-# Purpose: Load artifacts from Steps A-D and perform sanity checks.
-# *** UPDATED to check for GSE9660 ***
-# -----------------------------------------------------------------------------
+# ==============================================================================
+# SCRIPT 3: PREPARE VALIDATION DATA (VERSION-AGNOSTIC MATCHING)
+# PURPOSE: Align Validation Data (GSE129473) to Training Features (GSE64810)
+#          ignoring version suffixes (e.g., .10 vs .9)
+# INPUTS: 
+#   1. results/dds_object.rds (Validation Data)
+#   2. HD_ML_Ready_Data.csv   (Training Data)
+# OUTPUTS: 
+#   1. GSE129473_ML_Ready_Validation.csv
+# ==============================================================================
 
-library(Biobase)
-library(limma)
+library(DESeq2)
+library(dplyr)
+library(readr)
 
-message("=======================================================")
-message("   STARTING PIPELINE VERIFICATION")
-message("=======================================================")
-
-# --- Check Step A: Data Retrieval ---
-if(file.exists("data/raw/raw_gse_objects.RData")){
-  load("data/raw/raw_gse_objects.RData")
-  message("\n[Step A] Check: Raw Objects Loaded")
-  
-  # Check dimensions of the count matrix
-  d1 <- dim(gse64810_counts_matrix)
-  # *** UPDATED: Check gse9660 ***
-  d2 <- dim(gse9660)
-  
-  # Manually get sample count for gse64810 metadata
-  gse64810_samples <- ncol(gse64810_metadata_obj)
-  
-  message(paste("  - GSE64810 (RNA-seq) Dimensions:", d1[1], "Genes x", d1[2], "Samples"))
-  message(paste("  - GSE9660 (Array) Dimensions:   ", d2["Features"], "Probes x", d2["Samples"], "Samples"))
-  
-  if(d1[2] == gse64810_samples) message(paste("    -> PASS: GSE64810 sample count (", d1[2], ") matches methodology."))
-  else message(paste("    -> WARNING: Sample count mismatch for GSE64810. Data has", d1[2], "samples, metadata has", gse64810_samples))
-  
-  if(d2["Samples"] == 20) message(paste("    -> PASS: GSE9660 sample count is 20 (10 HD + 10 Ctrl)."))
-  else message(paste("    -> WARNING: GSE9660 sample count is not 20. Is", d2["Samples"]))
-  
-} else {
-  message("\n[Step A] FAIL: 'data/raw/raw_gse_objects.RData' not found.")
+# Function to strip version numbers (ENSG000001.10 -> ENSG000001)
+strip_version <- function(ids) {
+  sub("\\.[0-9]+$", "", ids)
 }
 
-# --- Check Step B: Preprocessing ---
-if(file.exists("data/processed/normalized_data.RData")){
-  load("data/processed/normalized_data.RData")
-  message("\n[Step B] Check: Preprocessing & Batch Correction")
-  
-  # Check Class Balance
-  print(table(merged_meta$Batch, merged_meta$Class))
-  message("  - Look at the table above. You should see samples in both '0' and '1' columns for BOTH datasets.")
-  
-  # Check Data Range (Log2 check)
-  rng <- range(corrected_expr)
-  message(paste("  - Data Range: Min =", round(rng[1],2), "| Max =", round(rng[2],2)))
-  
-  if(rng[2] < 100) message("    -> PASS: Data appears to be Log2 transformed (Max < 100).")
-  else message("    -> WARNING: Max value is high. Data might be raw counts (undesirable for ML).")
-  
-  # Check NAs
-  na_count <- sum(is.na(corrected_expr))
-  if(na_count == 0) message("    -> PASS: No missing values (NAs) in the matrix.")
-  else message(paste("    -> WARNING: Found", na_count, "NAs in the matrix."))
-  
-} else {
-  message("\n[Step B] FAIL: 'data/processed/normalized_data.RData' not found.")
+message(">>> [1/5] Loading Data...")
+
+if(!file.exists("results/dds_object.rds")) stop("Error: results/dds_object.rds not found.")
+dds_val <- readRDS("results/dds_object.rds")
+
+if(!file.exists("HD_ML_Ready_Data.csv")) stop("Error: HD_ML_Ready_Data.csv not found.")
+train_data <- read.csv("HD_ML_Ready_Data.csv", nrows = 1, check.names = FALSE)
+
+message(">>> [2/5] Extracting & Cleaning Feature IDs...")
+
+# 1. Get Training Genes and Strip Versions
+train_cols_original <- colnames(train_data)
+required_genes_original <- train_cols_original[train_cols_original != "Target_Class"]
+required_genes_base <- strip_version(required_genes_original)
+
+message(paste(">>> Model requires", length(required_genes_original), "genes."))
+
+# 2. Get Validation Genes and Strip Versions
+val_genes_original <- rownames(dds_val)
+val_genes_base <- strip_version(val_genes_original)
+
+# Check Overlap
+overlap <- intersect(required_genes_base, val_genes_base)
+message(paste(">>> Found", length(overlap), "matching genes (ignoring versions)."))
+
+if(length(overlap) < 100) {
+  stop("CRITICAL ERROR: Very low gene overlap (<100) even after stripping versions. Check datasets.")
 }
 
-# --- Check Step C: Differential Expression ---
-if(file.exists("data/processed/dea_results.RData")){
-  load("data/processed/dea_results.RData")
-  message("\n[Step C] Check: Differential Expression")
+message(">>> [3/5] Processing Validation Data...")
+
+# Variance Stabilizing Transformation
+vst_val <- vst(dds_val, blind = FALSE)
+val_matrix <- assay(vst_val)
+
+# Map Validation Rows to Base IDs
+rownames(val_matrix) <- val_genes_base
+
+# ------------------------------------------------------------------------------
+# CONSTRUCT FINAL MATRIX
+# ------------------------------------------------------------------------------
+# We need to reconstruct the matrix using the ORIGINAL Training Column Names
+# but pulling data using the BASE Gene IDs.
+
+final_matrix <- matrix(0, nrow = length(required_genes_original), ncol = ncol(val_matrix))
+rownames(final_matrix) <- required_genes_original
+colnames(final_matrix) <- colnames(val_matrix)
+
+# Fill the matrix
+found_count <- 0
+for(i in seq_along(required_genes_original)) {
+  original_id <- required_genes_original[i]
+  base_id <- required_genes_base[i]
   
-  # Check number of DEGs
-  n_degs <- nrow(deg_list)
-  message(paste("  - Significant DEGs found (p < 0.05):", n_degs))
-  
-  if(n_degs > 100) message("    -> PASS: DEA identified a healthy number of significant genes.")
-  else if (n_degs == 0) message("    -> WARNING: No significant genes found. Check normalization or model.")
-  else message("    -> NOTE: Very few DEGs found. This might be correct or a sign of weak signal.")
-  
-  # Check top genes
-  message("  - Top 3 Genes by LogFC:")
-  
-  # *** FIX: Add gene symbols as a column before trying to print them ***
-  if(nrow(deg_list) > 0) {
-    deg_list$Gene.symbol <- rownames(deg_list)
-    print(head(deg_list[, c("logFC", "adj.P.Val", "Gene.symbol")], 3))
-  } else {
-    message("    -> No DEGs to display.")
+  if(base_id %in% rownames(val_matrix)) {
+    # If multiple validation genes map to same base ID (rare), take the first one
+    final_matrix[i, ] <- val_matrix[base_id, , drop=FALSE][1, ]
+    found_count <- found_count + 1
   }
-  
-} else {
-  message("\n[Step C] FAIL: 'data/processed/dea_results.RData' not found.")
 }
 
-# --- Check Step D: Feature Selection ---
-if(file.exists("results/final_biomarker_dataset.csv")){
-  df <- read.csv("results/final_biomarker_dataset.csv", row.names = 1)
-  message("\n[Step D] Check: Final ML Dataset")
-  
-  # Check Dimensions
-  # Rows = Total Samples, Cols = Features + Class
-  dims <- dim(df)
-  message(paste("  - Final Dataset:", dims[1], "Samples x", dims[2], "Columns"))
-  
-  # Check Target Column
-  if("Class" %in% colnames(df)) message("    -> PASS: 'Class' column exists.")
-  else message("    -> FAIL: 'Class' column missing.")
-  
-  # Check Feature Count
-  # (Columns - 1 Class Column) should be close to 100 or your RFE limit
-  feat_count <- dims[2] - 1
-  message(paste("  - Feature Count:", feat_count))
-  
-  if(feat_count <= 100) message("    -> PASS: Feature selection reduced gene count to <= 100.")
-  else message("    -> NOTE: Feature count > 100. RFE might have selected a larger optimal set.")
-  
+message(paste(">>> Successfully filled", found_count, "out of", length(required_genes_original), "genes."))
+
+message(">>> [4/5] Final Formatting...")
+
+# Transpose: Rows = Samples, Columns = Genes
+ml_input_val <- t(final_matrix)
+ml_input_val <- as.data.frame(ml_input_val)
+
+# Add Target Label
+ml_input_val$Target_Class <- colData(dds_val)$condition
+
+# Reorder columns to match training data exactly (Target + Original Gene IDs)
+ml_input_val <- ml_input_val %>% select(all_of(train_cols_original))
+
+message(">>> [5/5] Verifying Column Order...")
+
+if (identical(colnames(ml_input_val), train_cols_original)) {
+  message("SUCCESS: Validation columns match Training columns EXACTLY.")
 } else {
-  message("\n[Step D] FAIL: 'results/final_biomarker_dataset.csv' not found.")
+  stop("CRITICAL ERROR: Column mismatch!")
 }
 
-message("\n=======================================================")
-message("   VERIFICATION COMPLETE")
-message("================================S=======================")
+# Save
+outfile <- "GSE129473_ML_Ready_Validation.csv"
+write.csv(ml_input_val, outfile, row.names = FALSE)
+
+message("========================================================")
+message("VALIDATION DATA PREPARED SUCCESSFULLY.")
+message(paste("File saved:", outfile))
+message("========================================================")
