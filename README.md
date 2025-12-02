@@ -283,7 +283,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
       <br />
       <sub>🤖 Machine Learning Models</sub>
       <br />
-      <a href="mailto:rahma.fathy@eng-st.cu.edu.eg">📧 Email</a>
+      <a href="mailto:rahma.edress04@eng-st.cu.edu.eg">📧 Email</a>
     </td>
   </tr>
 </table>
